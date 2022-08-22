@@ -2,6 +2,8 @@ package com.example.myapplication;
 
 import static com.example.myapplication.MainActivity.CONVERSATION;
 
+import static java.lang.Math.abs;
+
 import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -36,6 +38,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -55,9 +58,12 @@ public class AudioService extends Service implements RecognitionListener {
     private TokenNameFinder nameFinder;
     private Tokenizer tokenizer;
     private String theName = "";
+    private Map<String, Integer> weightedEntities;
 
     Instant convoStartTime = null;
     protected String conversation = "";
+    protected ArrayList<String> conversationArr = new ArrayList<String>();
+
     private final IBinder mBinder = new LocalBinder();
 
     private SpeechRecognizer speechRecognizer;
@@ -212,7 +218,8 @@ public class AudioService extends Service implements RecognitionListener {
 
                 if (res.getSeconds() >= 30) {
                     System.out.println("Reset stored conversation.");
-                    conversation = "";
+                    conversation = "Listening...";
+                    conversationArr.set(0, conversation);
                     convoStartTime = null;
                     theName = "Listening...";
                     updateNotification(theName);
@@ -240,14 +247,27 @@ public class AudioService extends Service implements RecognitionListener {
 
         if(data != null && data.size() > 0 && data.get(0) != null && data.get(0).length() > 0) {
             try {
-                conversation += StringUtils.capitalize(data.get(0) + ". ");
-                ArrayList<String> names = findNames(conversation);
+                conversation += StringUtils.capitalize(data.get(0).trim() + ". ");
+                conversationArr.add(StringUtils.capitalize(data.get(0).trim() + "."));
+                ArrayList<String> names = findNames(conversationArr);
+                System.out.println("namesARrrrrr: " + conversationArr.toString());
+//                System.out.println("convo: " + conversation);
 
-                System.out.println("convo: " + conversation);
-
-                String name = theName;
+//                String name = theName;
                 if(names.size() > 0) {
-                    name = pickName(names);
+                    weightedEntities = weightNamedEntitiesBasedOnDistanceBetween(names);
+                    weightedEntities = weightNamedEntitiesBasedOnDistanceFromStartOfConversation(weightedEntities);
+                }
+
+                String name = "tmp";
+
+                Iterator<Map.Entry<String, Integer>> itr = weightedEntities.entrySet().iterator();
+
+                while(itr.hasNext()) {
+                    Map.Entry<String, Integer> entry = itr.next();
+                    System.out.println("Key = " + entry.getKey() + ", Value = " + entry.getValue());
+
+pick the victor, descending list? or just top? top pair?
                 }
 
                 if(!theName.equals(name)) {
@@ -265,62 +285,82 @@ public class AudioService extends Service implements RecognitionListener {
         }
     }
 
-    // apply rules & heuristics to decide most likely name
-    private String pickName(ArrayList<String> names) {
-        Map<String, Integer> nameScoreMap = new HashMap<String, Integer>();
+    // add weight (bad/punishment) based on distance from start of conversation
+    private Map<String, Integer> weightNamedEntitiesBasedOnDistanceFromStartOfConversation(Map<String, Integer> weightedEntities) {
+        String strOnlyWords = conversation.replace(",", "").replace(".", "");
 
+        System.out.println("strOnlyWords: " + strOnlyWords.toString());
+        final List<String> words = Arrays.asList(strOnlyWords.split(" "));
+        System.out.println("words: " + words.toString());
+
+        for (String name : weightedEntities.keySet()) {
+            int distanceFromStart = words.indexOf(name);
+            System.out.println("indexOf " + name + " is: " + distanceFromStart);
+            System.out.println("weight before: " + weightedEntities.get(name));
+            weightedEntities.put(name, weightedEntities.get(name) + distanceFromStart);
+            System.out.println("weight after: " + weightedEntities.get(name));
+        }
+
+        return weightedEntities;
+    }
+
+    // apply rules & heuristics to decide most likely name
+    private Map<String, Integer> weightNamedEntitiesBasedOnDistanceBetween(ArrayList<String> names) {
+        Map<String, Integer> nameScoreMap = new HashMap<String, Integer>();
 
         // TODO: make names unique probably? or should frequency within conversation be accounted for?
         // TODO: fix below
 
-        // H1: distance between entities? Typically both names when meeting are nearby
-        for(int i = 0; i < names.size(); i++) {
-            for(int j = i; j < names.size(); j++) {
-                if(i != j) {
-                    System.out.println("("+i+" , "+j+")");
-                    System.out.println("comparing: " + names.get(i) + " : " + names.get(j));
-                    int distance = distanceBetweenWords(names.get(i), names.get(j));
+        System.out.println("APPLY WEIGHTS: " + names.toString());
 
-                    int vi = 0;
-                    if(nameScoreMap.get(i) != null) {
-                        System.out.println("value: " + nameScoreMap.get(i));
-                        vi = nameScoreMap.get(i);
-                    }
-                    int vj = 0;
-                    if(nameScoreMap.get(j) != null) {
-                        System.out.println("value: " + nameScoreMap.get(j));
-                        vj = nameScoreMap.get(j);
-                    }
-                    if(distance < vi || vi == 0) {
-                        nameScoreMap.put(names.get(i), distance);
-                    }
-                    if(distance < vj || vj == 0) {
-                        nameScoreMap.put(names.get(j), distance);
-                    }
+        // H1: distance between entities? Typically both names when meeting are nearby
+        for (int i = 0; i < names.size() - 1; i++) {
+            for (int j = i + 1; j < names.size(); j++) {
+                System.out.println("("+i+" , "+j+")");
+                System.out.println("comparing: " + names.get(i) + " : " + names.get(j));
+                int distance = distanceBetweenWords(names.get(i), names.get(j));
+
+                int vi = 0;
+                System.out.println("GET: " + nameScoreMap.get(names.get(i)));
+                if(nameScoreMap.get(names.get(i)) != null) {
+                    System.out.println("value: " + nameScoreMap.get(names.get(i)));
+                    vi = nameScoreMap.get(names.get(i));
+                }
+                int vj = 0;
+                if(nameScoreMap.get(names.get(j)) != null) {
+                    System.out.println("value: " + nameScoreMap.get(names.get(j)));
+                    vj = nameScoreMap.get(names.get(j));
+                }
+                if(distance < vi || vi == 0) {
+                    nameScoreMap.put(names.get(i), distance);
+                }
+                if(distance < vj || vj == 0) {
+                    nameScoreMap.put(names.get(j), distance);
                 }
             }
         }
-
 
         for (Map.Entry<String,Integer> entry : nameScoreMap.entrySet())
             System.out.println("Key = " + entry.getKey() +
                     ", Value = " + entry.getValue());
 
-        return names.get(0);
+        return nameScoreMap;
     }
 
     private int distanceBetweenWords(String w1, String w2) {
         // Remove any special chars from string
         String strOnlyWords = conversation.replace(",", "").replace(".", "");
 
+        System.out.println("strOnlyWords: " + strOnlyWords.toString());
         final List<String> words = Arrays.asList(strOnlyWords.split(" "));
+        System.out.println("words: " + words.toString());
         final int index1 = words.indexOf(w1);
         final int index2 = words.indexOf(w2);
         int distance = -1;
 
         // Check index of two words
         if (index1 != -1 && index2 != - 1) {
-            distance = index2 - index1;
+            distance = abs(index2 - index1);
         }
 
         System.out.println(distance);
@@ -332,19 +372,32 @@ public class AudioService extends Service implements RecognitionListener {
         System.out.println("onEvent: " + i);
     }
 
-    public ArrayList<String> findNames(String paragraph) throws IOException {
+    public ArrayList<String> findNames(ArrayList<String> paragraph) throws IOException {
 //        paragraph = "Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29 . Mr . Vinken is chairman of Elsevier N.V. , the Dutch publishing group . Rudolph Agnew , 55 years old and former chairman of Consolidated Gold Fields PLC , was named a director of this British industrial conglomerate.";
 
-        String[] tokens = tokenizer.tokenize(paragraph);
-        Span[] names = nameFinder.find(tokens);
+//        String[] tokens = tokenizer.tokenize(paragraph);
+//        Span[] names = nameFinder.find(tokens);
 
         ArrayList<String> namesList = new ArrayList<String>();
-        for(Span s: names) {
-//            nameToDisplay = tokens[s.getStart()];
-            System.out.print("Names found in convo: " + tokens[s.getStart()]);
-            namesList.add(tokens[s.getStart()]);
-        }
+//        for(Span s: names) {
+//            System.out.print("Names found in convo: " + tokens[s.getStart()]);
+//            namesList.add(tokens[s.getStart()]);
+//        }
 //        return tokens[names[0].getStart()];
+
+            for (int i = 0; i < paragraph.size(); i++) {
+                String[] tokens = tokenizer.tokenize(paragraph.get(i));
+                Span[] names = nameFinder.find(tokens);
+                // do something with the names
+
+                for(Span s: names) {
+                    System.out.println("Names found in convo: " + tokens[s.getStart()]);
+                    namesList.add(tokens[s.getStart()]);
+//                    System.out.println("TEST: " + s.getStart());
+                }
+
+                nameFinder.clearAdaptiveData();
+            }
 
         return namesList;
     }

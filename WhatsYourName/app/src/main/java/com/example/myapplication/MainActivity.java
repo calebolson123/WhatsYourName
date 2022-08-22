@@ -3,7 +3,11 @@ package com.example.myapplication;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -14,11 +18,18 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.IBinder;
+import android.text.method.ScrollingMovementMethod;
+import android.widget.TextView;
 import android.widget.Toast;
 
 
 public class MainActivity extends AppCompatActivity {
     public static final Integer RecordAudioRequestCode = 1;
+    public static final String CONVERSATION = "WhatIsYourName";
+    private DataUpdateReceiver dataUpdateReceiver;
+    protected TextView conversationView = null;
+    AudioService services;
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
@@ -29,14 +40,57 @@ public class MainActivity extends AppCompatActivity {
             checkPermission();
         }
 
+        ServiceConnection connection = new ServiceConnection() {
+            @Override
+            public void onServiceConnected(ComponentName name, IBinder service) {
+                AudioService.LocalBinder binderr = (AudioService.LocalBinder) service;
+                services = binderr.getService();
+            }
+
+            @Override
+            public void onServiceDisconnected(ComponentName name) {
+
+            }
+        };
+
         Intent intent = new Intent(this, AudioService.class);
         this.startForegroundService(intent);
 
+        bindService(intent, connection, Context.BIND_IMPORTANT);
+        conversationView = findViewById(R.id.conversation);
+        conversationView.setMovementMethod(new ScrollingMovementMethod());
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (dataUpdateReceiver == null) dataUpdateReceiver = new DataUpdateReceiver();
+        IntentFilter intentFilter = new IntentFilter(CONVERSATION);
+        registerReceiver(dataUpdateReceiver, intentFilter);
+
+        if(services != null) {
+            conversationView.setText(services.conversation);
+        }
+    }
+
+    protected void onPause() {
+        super.onPause();
+        if (dataUpdateReceiver != null) unregisterReceiver(dataUpdateReceiver);
     }
 
     private void checkPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.RECORD_AUDIO},RecordAudioRequestCode);
+        }
+    }
+
+    private class DataUpdateReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals(CONVERSATION)) {
+                String conversation = intent.getStringExtra(CONVERSATION);
+                conversationView.setText(conversation);
+            }
         }
     }
 

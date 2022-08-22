@@ -1,5 +1,7 @@
 package com.example.myapplication;
 
+import static com.example.myapplication.MainActivity.CONVERSATION;
+
 import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -19,7 +21,6 @@ import android.os.PowerManager;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
-import android.widget.TextView;
 
 import androidx.annotation.RequiresApi;
 import androidx.core.app.NotificationCompat;
@@ -29,18 +30,21 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.Array;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import opennlp.tools.namefind.NameFinderME;
 import opennlp.tools.namefind.TokenNameFinder;
 import opennlp.tools.namefind.TokenNameFinderModel;
 import opennlp.tools.tokenize.SimpleTokenizer;
 import opennlp.tools.tokenize.Tokenizer;
-import opennlp.tools.tokenize.TokenizerME;
-import opennlp.tools.tokenize.TokenizerModel;
 import opennlp.tools.util.Span;
 
 public class AudioService extends Service implements RecognitionListener {
@@ -53,10 +57,8 @@ public class AudioService extends Service implements RecognitionListener {
     private String theName = "";
 
     Instant convoStartTime = null;
-    private String conversation = "";
-
-    // Binder given to clients
-    private final IBinder iBinder = (IBinder) new LocalBinder();
+    protected String conversation = "";
+    private final IBinder mBinder = new LocalBinder();
 
     private SpeechRecognizer speechRecognizer;
 
@@ -157,9 +159,14 @@ public class AudioService extends Service implements RecognitionListener {
     }
 
     @Override
-    public IBinder onBind(Intent intent) {
-//        throw new UnsupportedOperationException("Not yet implemented");
-        return iBinder;
+    public IBinder onBind(Intent arg0) {
+        return mBinder;
+    }
+
+    public class LocalBinder extends Binder {
+        AudioService getService() {
+            return AudioService.this;
+        }
     }
 
     @Override
@@ -178,16 +185,11 @@ public class AudioService extends Service implements RecognitionListener {
     @Override
     public void onBeginningOfSpeech() {
         System.out.println("onBeginningOfSpeech");
-//        if(convoStartTime == null) {
         convoStartTime = Instant.now();
-//        }
-//        System.out.println("convoStartTime: " + convoStartTime);
     }
 
     @Override
-    public void onRmsChanged(float v) {
-
-    }
+    public void onRmsChanged(float v) {}
 
     @Override
     public void onBufferReceived(byte[] bytes) {
@@ -228,7 +230,6 @@ public class AudioService extends Service implements RecognitionListener {
     @Override
     public void onResults(Bundle bundle) {
         System.out.println("onResults");
-
         // TODO: restart activity here? consider convo done?
         startListeningAgain();
     }
@@ -236,26 +237,94 @@ public class AudioService extends Service implements RecognitionListener {
     @Override
     public void onPartialResults(Bundle bundle) {
         ArrayList<String> data = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-//        System.out.println("data: " + data);
 
         if(data != null && data.size() > 0 && data.get(0) != null && data.get(0).length() > 0) {
             try {
                 conversation += StringUtils.capitalize(data.get(0) + ". ");
-                String name = findName(conversation);
-                if(name.length() > 0 && !theName.equals(name)) {
+                ArrayList<String> names = findNames(conversation);
+
+                System.out.println("convo: " + conversation);
+
+                String name = theName;
+                if(names.size() > 0) {
+                    name = pickName(names);
+                }
+
+                if(!theName.equals(name)) {
                     System.out.println("Name updating to: " + name);
                     theName = name;
                     updateNotification(name);
                 }
-                System.out.println("convo: " + conversation);
 
-//this cant happen here, has to happen in activity..need to bind/pass back, look it up
-//                TextView textView = (TextView) findViewById(R.id.conversation);
-//                textView.setText("Enter whatever you Like!");
+                Intent intent = new Intent(CONVERSATION);
+                intent.putExtra(CONVERSATION, conversation);
+                sendBroadcast(intent);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+    }
+
+    // apply rules & heuristics to decide most likely name
+    private String pickName(ArrayList<String> names) {
+        Map<String, Integer> nameScoreMap = new HashMap<String, Integer>();
+
+
+        // TODO: make names unique probably? or should frequency within conversation be accounted for?
+        // TODO: fix below
+
+        // H1: distance between entities? Typically both names when meeting are nearby
+        for(int i = 0; i < names.size(); i++) {
+            for(int j = i; j < names.size(); j++) {
+                if(i != j) {
+                    System.out.println("("+i+" , "+j+")");
+                    System.out.println("comparing: " + names.get(i) + " : " + names.get(j));
+                    int distance = distanceBetweenWords(names.get(i), names.get(j));
+
+                    int vi = 0;
+                    if(nameScoreMap.get(i) != null) {
+                        System.out.println("value: " + nameScoreMap.get(i));
+                        vi = nameScoreMap.get(i);
+                    }
+                    int vj = 0;
+                    if(nameScoreMap.get(j) != null) {
+                        System.out.println("value: " + nameScoreMap.get(j));
+                        vj = nameScoreMap.get(j);
+                    }
+                    if(distance < vi || vi == 0) {
+                        nameScoreMap.put(names.get(i), distance);
+                    }
+                    if(distance < vj || vj == 0) {
+                        nameScoreMap.put(names.get(j), distance);
+                    }
+                }
+            }
+        }
+
+
+        for (Map.Entry<String,Integer> entry : nameScoreMap.entrySet())
+            System.out.println("Key = " + entry.getKey() +
+                    ", Value = " + entry.getValue());
+
+        return names.get(0);
+    }
+
+    private int distanceBetweenWords(String w1, String w2) {
+        // Remove any special chars from string
+        String strOnlyWords = conversation.replace(",", "").replace(".", "");
+
+        final List<String> words = Arrays.asList(strOnlyWords.split(" "));
+        final int index1 = words.indexOf(w1);
+        final int index2 = words.indexOf(w2);
+        int distance = -1;
+
+        // Check index of two words
+        if (index1 != -1 && index2 != - 1) {
+            distance = index2 - index1;
+        }
+
+        System.out.println(distance);
+        return distance;
     }
 
     @Override
@@ -263,28 +332,21 @@ public class AudioService extends Service implements RecognitionListener {
         System.out.println("onEvent: " + i);
     }
 
-    public class LocalBinder extends Binder {
-        public AudioService getService() {
-            return AudioService.this;
-        }
-    }
-
-
-    public String findName(String paragraph) throws IOException {
-        // paragraph = "Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29 . Mr . Vinken is chairman of Elsevier N.V. , the Dutch publishing group . Rudolph Agnew , 55 years old and former chairman of Consolidated Gold Fields PLC , was named a director of this British industrial conglomerate.";
+    public ArrayList<String> findNames(String paragraph) throws IOException {
+//        paragraph = "Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29 . Mr . Vinken is chairman of Elsevier N.V. , the Dutch publishing group . Rudolph Agnew , 55 years old and former chairman of Consolidated Gold Fields PLC , was named a director of this British industrial conglomerate.";
 
         String[] tokens = tokenizer.tokenize(paragraph);
         Span[] names = nameFinder.find(tokens);
 
-        String nameToDisplay = "";
-        System.out.print("Names found in convo: ");
+        ArrayList<String> namesList = new ArrayList<String>();
         for(Span s: names) {
-            nameToDisplay = tokens[s.getStart()];
-            System.out.print(tokens[s.getStart()]);
+//            nameToDisplay = tokens[s.getStart()];
+            System.out.print("Names found in convo: " + tokens[s.getStart()]);
+            namesList.add(tokens[s.getStart()]);
         }
 //        return tokens[names[0].getStart()];
 
-        return nameToDisplay;
+        return namesList;
     }
 
 }

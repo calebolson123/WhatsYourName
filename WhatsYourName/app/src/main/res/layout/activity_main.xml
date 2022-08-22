@@ -21,6 +21,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="0"
         android:text="Listening..."
+        android:scrollbars = "vertical"
         android:textSize="18sp"
         android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="parent"

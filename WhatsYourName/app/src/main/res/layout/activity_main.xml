@@ -4,30 +4,73 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".MainActivity">
 
-<!--    <TextView-->
+    tools:context=".MainActivity">
+<!--<androidx.constraintlayout.helper.widget.Flow-->
+<!--    android:id="@+id/socialsButtonsFlow"-->
+<!--    android:layout_width="0dp"-->
+<!--    android:layout_height="wrap_content"-->
+<!--    android:layout_marginTop="6dp"-->
+<!--    app:flow_horizontalGap="8dp"-->
+<!--    app:flow_verticalGap="4dp"-->
+<!--    app:flow_wrapMode="aligned"-->
+<!--    app:flow_horizontalStyle="spread_inside"-->
+<!--    app:constraint_referenced_ids="vkButton,twitterButton,facebookButton,youtubeButton,instagramButton,odnoklassnikiButton,tiktokButton"-->
+<!--    app:layout_constraintEnd_toEndOf="@id/socialsLabel"-->
+<!--    app:layout_constraintStart_toStartOf="@+id/socialsLabel"-->
+<!--    app:layout_constraintTop_toBottomOf="@+id/socialsLabel" />-->
+
+<!--<android.widget.RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"-->
+<!--    android:layout_width="fill_parent"-->
+<!--    android:layout_height="wrap_content"-->
+<!--    android:orientation="vertical" >-->
+
+        <TextView
+            android:id="@+id/scoredEntities"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:gravity="center"
+            android:text=""
+            android:textSize="30sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toTopOf="@+id/conversation"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/conversation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:layout_weight="0"
+            android:scrollbars="vertical"
+            android:text="Listening..."
+            android:textSize="16sp"
+            android:textStyle="italic"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.498"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/scoredEntities" />
+
+
+        <!--    <TextView-->
+<!--        android:id="@+id/conversation"-->
 <!--        android:layout_width="wrap_content"-->
 <!--        android:layout_height="wrap_content"-->
+<!--        android:layout_weight="0"-->
 <!--        android:text="Listening..."-->
+<!--        android:scrollbars = "vertical"-->
+<!--        android:textSize="18sp"-->
+<!--        android:textStyle="bold"-->
 <!--        app:layout_constraintBottom_toBottomOf="parent"-->
 <!--        app:layout_constraintEnd_toEndOf="parent"-->
 <!--        app:layout_constraintStart_toStartOf="parent"-->
-<!--        app:layout_constraintTop_toTopOf="parent" />-->
-
-    <TextView
-        android:id="@+id/conversation"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_weight="0"
-        android:text="Listening..."
-        android:scrollbars = "vertical"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        />
+<!--        app:layout_constraintTop_toTopOf="parent"-->
+<!--        app:layout_constrainedHeight="true"-->
+<!--        app:layout_constraintHeight_max="300dp"-->
+<!--        />-->
 
 </androidx.constraintlayout.widget.ConstraintLayout>

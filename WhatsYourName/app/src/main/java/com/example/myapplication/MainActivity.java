@@ -27,8 +27,10 @@ import android.widget.Toast;
 public class MainActivity extends AppCompatActivity {
     public static final Integer RecordAudioRequestCode = 1;
     public static final String CONVERSATION = "WhatIsYourName";
+    public static final String SCORED_ENTITIES = "WhatIsYourName_ScoredEntities";
     private DataUpdateReceiver dataUpdateReceiver;
     protected TextView conversationView = null;
+    protected TextView scoredEntitiesView = null;
     AudioService services;
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -58,6 +60,7 @@ public class MainActivity extends AppCompatActivity {
 
         bindService(intent, connection, Context.BIND_IMPORTANT);
         conversationView = findViewById(R.id.conversation);
+        scoredEntitiesView = findViewById(R.id.scoredEntities);
         conversationView.setMovementMethod(new ScrollingMovementMethod());
     }
 
@@ -67,9 +70,12 @@ public class MainActivity extends AppCompatActivity {
         if (dataUpdateReceiver == null) dataUpdateReceiver = new DataUpdateReceiver();
         IntentFilter intentFilter = new IntentFilter(CONVERSATION);
         registerReceiver(dataUpdateReceiver, intentFilter);
+        IntentFilter intentFilter2 = new IntentFilter(SCORED_ENTITIES);
+        registerReceiver(dataUpdateReceiver, intentFilter2);
 
         if(services != null) {
             conversationView.setText(services.conversation);
+            scoredEntitiesView.setText(services.prettyStringSortedScoresAndNames());
         }
     }
 
@@ -90,6 +96,10 @@ public class MainActivity extends AppCompatActivity {
             if (intent.getAction().equals(CONVERSATION)) {
                 String conversation = intent.getStringExtra(CONVERSATION);
                 conversationView.setText(conversation);
+            }
+            if(intent.getAction().equals(SCORED_ENTITIES)) {
+                String prettyScores = intent.getStringExtra(SCORED_ENTITIES);
+                scoredEntitiesView.setText(prettyScores);
             }
         }
     }

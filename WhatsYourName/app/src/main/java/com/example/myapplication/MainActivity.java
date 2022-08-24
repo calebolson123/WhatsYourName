@@ -128,6 +128,7 @@ public class MainActivity extends AppCompatActivity {
         public void onReceive(Context context, Intent intent) {
             if(intent.getAction().equals(SCORED_ENTITIES)) {
                 String prettyScores = intent.getStringExtra(SCORED_ENTITIES);
+//                System.out.println("prettyScores rawwww: " + prettyScores);
                 m = Pattern.compile("\\w+").matcher(prettyScores);
 
                 int i = 0;
@@ -137,6 +138,7 @@ public class MainActivity extends AppCompatActivity {
                     prettyScores = prettyScores.replaceAll(m.group(), coloredMatch);
                     i++;
                 }
+
                 scoredEntitiesView.setText(Html.fromHtml(prettyScores));
             }
 

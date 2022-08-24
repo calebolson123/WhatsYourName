@@ -19,9 +19,16 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.IBinder;
+import android.text.Html;
 import android.text.method.ScrollingMovementMethod;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -31,6 +38,8 @@ public class MainActivity extends AppCompatActivity {
     private DataUpdateReceiver dataUpdateReceiver;
     protected TextView conversationView = null;
     protected TextView scoredEntitiesView = null;
+    private Matcher m = null;
+    List<String> highlightColors = Arrays.asList("green", "red", "yellow", "blue", "purple", "brown", "orange", "pink");
     AudioService services;
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -74,8 +83,32 @@ public class MainActivity extends AppCompatActivity {
         registerReceiver(dataUpdateReceiver, intentFilter2);
 
         if(services != null) {
-            conversationView.setText(services.conversation);
-            scoredEntitiesView.setText(services.prettyStringSortedScoresAndNames());
+            String prettyScores = services.prettyStringSortedScoresAndNames();
+            m = Pattern.compile("\\w+").matcher(prettyScores);
+
+            int i = 0;
+            while (m.find()) {
+                String highlight = highlightColors.get(i);
+                String coloredMatch = String.format("<font color=%s>%s</font>", highlight, m.group());
+                prettyScores = prettyScores.replaceAll(m.group(), coloredMatch);
+                i++;
+            }
+            scoredEntitiesView.setText(Html.fromHtml(prettyScores));
+
+            String conversation = services.conversation;
+            int j = 0;
+            if (m != null) {
+                m.reset();
+                while (m.find()) {
+                    String highlight = highlightColors.get(j);
+                    String coloredMatch = String.format("<font color=%s>%s</font>", highlight, m.group());
+                    conversation = conversation.replaceFirst(m.group(), coloredMatch);
+                    j++;
+                }
+                conversationView.setText(Html.fromHtml(conversation));
+            } else {
+                conversationView.setText(conversation);
+            }
         }
     }
 
@@ -93,13 +126,34 @@ public class MainActivity extends AppCompatActivity {
     private class DataUpdateReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(CONVERSATION)) {
-                String conversation = intent.getStringExtra(CONVERSATION);
-                conversationView.setText(conversation);
-            }
             if(intent.getAction().equals(SCORED_ENTITIES)) {
                 String prettyScores = intent.getStringExtra(SCORED_ENTITIES);
-                scoredEntitiesView.setText(prettyScores);
+                m = Pattern.compile("\\w+").matcher(prettyScores);
+
+                int i = 0;
+                while (m.find()) {
+                    String highlight = highlightColors.get(i);
+                    String coloredMatch = String.format("<font color=%s>%s</font>", highlight, m.group());
+                    prettyScores = prettyScores.replaceAll(m.group(), coloredMatch);
+                    i++;
+                }
+                scoredEntitiesView.setText(Html.fromHtml(prettyScores));
+            }
+
+            String conversation = services.conversation;
+
+            int i = 0;
+            if (m != null) {
+                m.reset();
+                while (m.find()) {
+                    String highlight = highlightColors.get(i);
+                    String coloredMatch = String.format("<font color=%s>%s</font>", highlight, m.group());
+                    conversation = conversation.replaceFirst(m.group(), coloredMatch);
+                    i++;
+                }
+                conversationView.setText(Html.fromHtml(conversation));
+            } else {
+                conversationView.setText(conversation);
             }
         }
     }

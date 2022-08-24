@@ -131,7 +131,8 @@ public class AudioService extends Service {
 //            System.out.println("3333333333");
 //                speechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_ENABLE_FORMATTING, FORMATTING_OPTIMIZE_QUALITY);
 //        }
-//        speechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 999999999);
+        speechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 999999999);
+//        speechRecognizerIntent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, "999999999999999");
 
         if(speechRecognizer != null) speechRecognizer.destroy();
         speechRecognizer = null;
@@ -351,9 +352,7 @@ public class AudioService extends Service {
         public void onRmsChanged(float v) {}
 
         @Override
-        public void onBufferReceived(byte[] bytes) {
-            System.out.println("onBufferReceived");
-        }
+        public void onBufferReceived(byte[] bytes) {}
 
         @RequiresApi(api = Build.VERSION_CODES.M)
         @Override
@@ -388,12 +387,8 @@ public class AudioService extends Service {
         }
 
         @RequiresApi(api = Build.VERSION_CODES.M)
-        @Override
-        public void onResults(Bundle bundle) {
-            System.out.println("onResults: " + bundle);
-            ArrayList<String> data = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-
-//            float[] scores2 = bundle.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES);
+        private void handleResults(ArrayList<String> data) {
+            //            float[] scores2 = bundle.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES);
             for(int i=0; i< data.size(); i++) {
                 System.out.println("data[i]: " + data.get(i));
             }
@@ -401,10 +396,9 @@ public class AudioService extends Service {
 
             if(data != null && data.size() > 0 && data.get(0) != null && data.get(0).length() > 0) {
                 try {
-//                conversation += "Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29 . Mr . Vinken is chairman of Elsevier N.V. , the Dutch publishing group . Rudolph Agnew , 55 years old and former chairman of Consolidated Gold Fields PLC , was named a director of this British industrial conglomerate.";
-
+//                    conversation += "Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29 . Mr . Vinken is chairman of Elsevier N.V. , the Dutch publishing group . Rudolph Agnew , 55 years old and former chairman of Consolidated Gold Fields PLC , was named a director of this British industrial conglomerate.";
                     conversation += StringUtils.capitalize(data.get(0).trim() + ". ");
-                    conversationArr.add(StringUtils.capitalize(data.get(0).trim() + "."));
+                    conversationArr.add(StringUtils.capitalize(data.get(0)));
 
                     ArrayList<String> names = findNames(conversationArr);
                     System.out.println("conversationArr: " + conversationArr.toString());
@@ -486,6 +480,15 @@ public class AudioService extends Service {
             }
         }
 
+        @RequiresApi(api = Build.VERSION_CODES.M)
+        @Override
+        public void onResults(Bundle bundle) {
+            System.out.println("onResults: " + bundle);
+            ArrayList<String> data = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+
+            handleResults(data);
+        }
+
         @RequiresApi(api = Build.VERSION_CODES.N)
         @Override
         public void onPartialResults(Bundle bundle) {
@@ -493,90 +496,93 @@ public class AudioService extends Service {
             ArrayList<String> data = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
 
             if(data != null && data.size() > 0 && data.get(0) != null && data.get(0).length() > 0) {
-                try {
-//                conversation += "Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29 . Mr . Vinken is chairman of Elsevier N.V. , the Dutch publishing group . Rudolph Agnew , 55 years old and former chairman of Consolidated Gold Fields PLC , was named a director of this British industrial conglomerate.";
-
-                    conversation += StringUtils.capitalize(data.get(0).trim() + ". ");
-                    conversationArr.add(StringUtils.capitalize(data.get(0).trim() + "."));
-
-                    ArrayList<String> names = findNames(conversationArr);
-                    System.out.println("conversationArr: " + conversationArr.toString());
-                    System.out.println("convo: " + conversation);
-// TODO: partial results that look like sentence should stay sentence (no extra period)... throwing off classifier
-//                String name = theName;
-                    if(names.size() > 0) {
-                        weightedEntities = weightNamedEntitiesBasedOnDistanceBetween(names);
-                        weightedEntities = weightNamedEntitiesBasedOnDistanceFromStartOfConversation(weightedEntities);
-                    }
-
-                    String name = "Listening...";
-                    int maxWeight = 0;
-                    int minWeight = 999;
-                    if (weightedEntities != null) {
-                        if(names.size() == 1) {
-                            name = names.get(0);
-                        } else if(names.size() == 2) {
-                            name = names.get(0) + " - " + names.get(1);
-                        } else {
-                            System.out.println("names:::: " + names.size() + " : " + names.toString());
-                            name = "";
-                            for (int weight : weightedEntities.values()) {
-                                minWeight = Math.min(weight, minWeight);
-                                maxWeight = Math.max(weight, maxWeight);
-                            }
-                            System.out.println("MAX & MIN: " + maxWeight + " : " + minWeight);
-                            Iterator<Map.Entry<String, Integer>> itr = weightedEntities.entrySet().iterator();
-                            ArrayList<Double> scores = new ArrayList();
-
-                            sortedScoresAndNames.clear();
-                            while(itr.hasNext()) {
-                                Map.Entry<String, Integer> entry = itr.next();
-                                System.out.println("Key = " + entry.getKey() + ", Value = " + entry.getValue());
-                                String entityName = entry.getKey();
-                                Integer score = entry.getValue();
-
-                                double percentageOfTotal = (((double)score - (double)minWeight) / (double)(maxWeight - minWeight));
-
-                                String percentageOfTotalStr = String.format("%.2f", percentageOfTotal);
-                                System.out.println("name, value and percentage: " + entry.getKey() + " : " + entry.getValue() + " : percentage: " + percentageOfTotalStr);
-//                            scoredEntities.put(entry.getKey(), percentageOfTotal);
-//                            name += entry.getKey() + ": " + percentageOfTotalStr + "\n";
-                                scores.add(percentageOfTotal);
-                                sortedScoresAndNames.put(percentageOfTotal, entityName);
-//                            scoredEntities.add(new Pair<S, Number>(entry.getKey(), percentageOfTotalStr));
-                            }
-
-                            Collections.sort(scores);
-                            double mostLikely = scores.get(0);
-                            double secondMostLikely = scores.get(1);
-                            if(secondMostLikely < 0.5) { // display both names
-                                name = sortedScoresAndNames.get(mostLikely) + " - " + sortedScoresAndNames.get(secondMostLikely);
-                            } else { // just top probably
-                                name = sortedScoresAndNames.get(mostLikely);
-                            }
-                            System.out.println("top two: " + scores.get(0) + " : " + scores.get(1));
-                        }
-                    }
-
-                    if(!theName.equals(name)) {
-                        System.out.println("Name updating to: " + name);
-                        theName = name;
-                        updateNotification(name);
-                    }
-
-                    // send convo & ranked names over to activity
-                    Intent intent = new Intent(CONVERSATION);
-                    intent.putExtra(CONVERSATION, conversation);
-                    sendBroadcast(intent);
-
-                    String prettyScoresAndNames = prettyStringSortedScoresAndNames();
-                    Intent intentPrettyScores = new Intent(SCORED_ENTITIES);
-                    intentPrettyScores.putExtra(SCORED_ENTITIES, prettyScoresAndNames);
-                    sendBroadcast(intentPrettyScores);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                handleResults(data);
             }
+//            if(data != null && data.size() > 0 && data.get(0) != null && data.get(0).length() > 0) {
+//                try {
+////                conversation += "Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29 . Mr . Vinken is chairman of Elsevier N.V. , the Dutch publishing group . Rudolph Agnew , 55 years old and former chairman of Consolidated Gold Fields PLC , was named a director of this British industrial conglomerate.";
+//
+//                    conversation += StringUtils.capitalize(data.get(0).trim() + ". ");
+//                    conversationArr.add(StringUtils.capitalize(data.get(0).trim() + "."));
+//
+//                    ArrayList<String> names = findNames(conversationArr);
+//                    System.out.println("conversationArr: " + conversationArr.toString());
+//                    System.out.println("convo: " + conversation);
+//// TODO: partial results that look like sentence should stay sentence (no extra period)... throwing off classifier
+////                String name = theName;
+//                    if(names.size() > 0) {
+//                        weightedEntities = weightNamedEntitiesBasedOnDistanceBetween(names);
+//                        weightedEntities = weightNamedEntitiesBasedOnDistanceFromStartOfConversation(weightedEntities);
+//                    }
+//
+//                    String name = "Listening...";
+//                    int maxWeight = 0;
+//                    int minWeight = 999;
+//                    if (weightedEntities != null) {
+//                        if(names.size() == 1) {
+//                            name = names.get(0);
+//                        } else if(names.size() == 2) {
+//                            name = names.get(0) + " - " + names.get(1);
+//                        } else {
+//                            System.out.println("names:::: " + names.size() + " : " + names.toString());
+//                            name = "";
+//                            for (int weight : weightedEntities.values()) {
+//                                minWeight = Math.min(weight, minWeight);
+//                                maxWeight = Math.max(weight, maxWeight);
+//                            }
+//                            System.out.println("MAX & MIN: " + maxWeight + " : " + minWeight);
+//                            Iterator<Map.Entry<String, Integer>> itr = weightedEntities.entrySet().iterator();
+//                            ArrayList<Double> scores = new ArrayList();
+//
+//                            sortedScoresAndNames.clear();
+//                            while(itr.hasNext()) {
+//                                Map.Entry<String, Integer> entry = itr.next();
+//                                System.out.println("Key = " + entry.getKey() + ", Value = " + entry.getValue());
+//                                String entityName = entry.getKey();
+//                                Integer score = entry.getValue();
+//
+//                                double percentageOfTotal = (((double)score - (double)minWeight) / (double)(maxWeight - minWeight));
+//
+//                                String percentageOfTotalStr = String.format("%.2f", percentageOfTotal);
+//                                System.out.println("name, value and percentage: " + entry.getKey() + " : " + entry.getValue() + " : percentage: " + percentageOfTotalStr);
+////                            scoredEntities.put(entry.getKey(), percentageOfTotal);
+////                            name += entry.getKey() + ": " + percentageOfTotalStr + "\n";
+//                                scores.add(percentageOfTotal);
+//                                sortedScoresAndNames.put(percentageOfTotal, entityName);
+////                            scoredEntities.add(new Pair<S, Number>(entry.getKey(), percentageOfTotalStr));
+//                            }
+//
+//                            Collections.sort(scores);
+//                            double mostLikely = scores.get(0);
+//                            double secondMostLikely = scores.get(1);
+//                            if(secondMostLikely < 0.5) { // display both names
+//                                name = sortedScoresAndNames.get(mostLikely) + " - " + sortedScoresAndNames.get(secondMostLikely);
+//                            } else { // just top probably
+//                                name = sortedScoresAndNames.get(mostLikely);
+//                            }
+//                            System.out.println("top two: " + scores.get(0) + " : " + scores.get(1));
+//                        }
+//                    }
+//
+//                    if(!theName.equals(name)) {
+//                        System.out.println("Name updating to: " + name);
+//                        theName = name;
+//                        updateNotification(name);
+//                    }
+//
+//                    // send convo & ranked names over to activity
+//                    Intent intent = new Intent(CONVERSATION);
+//                    intent.putExtra(CONVERSATION, conversation);
+//                    sendBroadcast(intent);
+//
+//                    String prettyScoresAndNames = prettyStringSortedScoresAndNames();
+//                    Intent intentPrettyScores = new Intent(SCORED_ENTITIES);
+//                    intentPrettyScores.putExtra(SCORED_ENTITIES, prettyScoresAndNames);
+//                    sendBroadcast(intentPrettyScores);
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//            }
         }
     }
 }

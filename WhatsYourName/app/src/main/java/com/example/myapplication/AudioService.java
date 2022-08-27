@@ -63,7 +63,7 @@ public class AudioService extends Service {
     private Tokenizer tokenizer;
     private String theName = "";
     private Map<String, Integer> weightedEntities;
-    private Map<String, Double> scoredEntities;
+//    private Map<String, Double> scoredEntities;
     protected TreeMap<Double, String> sortedScoresAndNames = new TreeMap<Double, String>();
 
     protected String conversation = "";
@@ -193,6 +193,7 @@ public class AudioService extends Service {
                 }
                 i++;
             }
+
         } else {
             if(!theName.equals("Listening...")) {
                 prettyString = theName;
@@ -222,7 +223,7 @@ public class AudioService extends Service {
         // distance between entities. Typically both names when meeting are nearby
         for (int i = 0; i < names.size() - 1; i++) {
             for (int j = i + 1; j < names.size(); j++) {
-                int distance = distanceBetweenWords(names.get(i), names.get(j));
+                int distance = distanceBetweenWords(names.get(i), names.get(j)) * 4; // arbitrary multiplier to make this matter more
 
                 int vi = 0;
                 if(nameScoreMap.get(names.get(i)) != null) {
@@ -284,13 +285,13 @@ public class AudioService extends Service {
 
         @Override
         public void onReadyForSpeech(Bundle bundle) {
-            System.out.println("onReadyForSpeech");
+//            System.out.println("onReadyForSpeech");
         }
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         @Override
         public void onBeginningOfSpeech() {
-            System.out.println("onBeginningOfSpeech");
+//            System.out.println("onBeginningOfSpeech");
             convoStartTime = Instant.now();
         }
 
@@ -303,7 +304,7 @@ public class AudioService extends Service {
         @RequiresApi(api = Build.VERSION_CODES.M)
         @Override
         public void onEndOfSpeech() {
-            System.out.println("onEndOfSpeech");
+//            System.out.println("onEndOfSpeech");
         }
 
         @RequiresApi(api = Build.VERSION_CODES.O)
@@ -316,6 +317,8 @@ public class AudioService extends Service {
                     if (res.getSeconds() >= 30) {
                         conversation = "Listening...";
                         conversationArr.clear();
+//                        scoredEntities.clear();
+                        sortedScoresAndNames.clear();
                         convoStartTime = null;
                         theName = "Listening...";
                         updateNotification(theName);
@@ -341,7 +344,7 @@ public class AudioService extends Service {
                     conversationArr.add(StringUtils.capitalize(data.get(0)));
 
                     ArrayList<String> names = findNames(conversationArr);
-                    System.out.println("convo: " + conversation);
+//                    System.out.println("convo: " + conversation);
                     if(names.size() > 0) {
                         weightedEntities = weightNamedEntitiesBasedOnDistanceBetween(names);
                         weightedEntities = weightNamedEntitiesBasedOnDistanceFromStartOfConversation(weightedEntities);
@@ -356,7 +359,7 @@ public class AudioService extends Service {
                         } else if(names.size() == 2) {
                             name = names.get(0) + " - " + names.get(1);
                         } else {
-                            System.out.println("names:::: " + names.size() + " : " + names.toString());
+//                            System.out.println("names:::: " + names.size() + " : " + names.toString());
                             name = "";
                             for (int weight : weightedEntities.values()) {
                                 minWeight = Math.min(weight, minWeight);
@@ -371,6 +374,8 @@ public class AudioService extends Service {
                                 Map.Entry<String, Integer> entry = itr.next();
                                 String entityName = entry.getKey();
                                 Integer score = entry.getValue();
+
+//                                System.out.println("name and score: " + entityName + " : " + score);
 
                                 double percentageOfTotal = (((double)score - (double)minWeight) / (double)(maxWeight - minWeight));
 
@@ -412,7 +417,7 @@ public class AudioService extends Service {
         @RequiresApi(api = Build.VERSION_CODES.M)
         @Override
         public void onResults(Bundle bundle) {
-            System.out.println("onResults: " + bundle);
+//            System.out.println("onResults: " + bundle);
             ArrayList<String> data = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
 
             handleResults(data);
@@ -421,7 +426,7 @@ public class AudioService extends Service {
         @RequiresApi(api = Build.VERSION_CODES.N)
         @Override
         public void onPartialResults(Bundle bundle) {
-            System.out.println("onPartialResults");
+//            System.out.println("onPartialResults");
             ArrayList<String> data = bundle.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
 
             if(data != null && data.size() > 0 && data.get(0) != null && data.get(0).length() > 0) {
